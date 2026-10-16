@@ -21,9 +21,7 @@ use std::{borrow::Cow, collections::HashMap, sync::OnceLock};
 use calloop::LoopSignal;
 use inox_protocols::{
     ipc::inox_ipc::server::inox_ipc::{InoxIpc, ReloadResult, Request as InoxIpcRequest},
-    standard::core::server::{
-        wl_buffer::WlBuffer, wl_seat::WlSeat, wl_surface::WlSurface,
-    },
+    standard::core::server::{wl_buffer::WlBuffer, wl_seat::WlSeat, wl_surface::WlSurface},
 };
 use smithay::{
     backend::{
