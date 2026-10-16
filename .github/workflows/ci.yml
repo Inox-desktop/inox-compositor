@@ -13,6 +13,9 @@ jobs:
   ci:
     name: fmt / clippy / test / build / doc / deny
     runs-on: ubuntu-latest
+    env:
+      # Headless integration tests render through Mesa's llvmpipe (software) backend.
+      LIBGL_ALWAYS_SOFTWARE: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,6 +34,23 @@ jobs:
       - name: Clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
 
+      # EGL/Mesa is only a test-time (runtime) dependency: Smithay's GlesRenderer
+      # dlopen()s libEGL.so.1, nothing links against it at build time. libegl1 is the
+      # GLVND loader and pulls Mesa's EGL vendor driver (libegl-mesa0 -> libgbm1,
+      # libglapi-mesa, mesa-libgallium); libgl1-mesa-dri provides the DRI drivers,
+      # including the llvmpipe/swrast software rasterizer used with
+      # LIBGL_ALWAYS_SOFTWARE=1. apt lists are already cached on GitHub runners, so no
+      # extra cache step is needed.
+      - name: Install EGL/Mesa runtime (headless software rendering)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libegl1 libgl1-mesa-dri
+
+      # Headless integration tests (tests/) require software rendering: M1 creates a
+      # logical output and renders a solid frame via EGL's surfaceless platform
+      # (EGL_MESA_platform_surfaceless) + GlesRenderer, driven by the
+      # LIBGL_ALWAYS_SOFTWARE=1 set in the job env above (PRD §6.1). cargo test runs
+      # the lib, bin and tests/ integration targets.
       - name: Test
         run: cargo test --all-features
 
