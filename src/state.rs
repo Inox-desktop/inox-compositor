@@ -9,7 +9,7 @@
 //! tracking and focus delivery, while [`crate::input::action_for_key`] turns a
 //! key press into a compositor [`Action`]. [`InoxState::inject_key`] and the
 //! pointer injection methods feed that path, so keyboard and pointer events can
-//! be exercised without a libinput backend (see ADR 0006).
+//! be exercised without a libinput backend (see ADR 0008).
 
 use std::{borrow::Cow, collections::HashMap, sync::OnceLock};
 

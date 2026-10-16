@@ -5,7 +5,7 @@
 //! The test drives a real Wayland client (built with `wayland-client`) over an
 //! in-process socket pair against a compositor state on the current thread. The
 //! client runs on a second thread while the main thread services the display, so
-//! no process boundary is needed (see ADR 0006).
+//! no process boundary is needed (see ADR 0008).
 //!
 //! Everything lives in a single test function on purpose: a process may only ever
 //! hold one EGL display (see the `SAFETY` note in `src/render.rs`), and test
