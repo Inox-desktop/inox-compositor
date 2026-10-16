@@ -1,5 +1,9 @@
 [advisories]
 yanked = "warn"
+# `cgmath` is unmaintained (RUSTSEC-2026-0196) but is an unavoidable transitive
+# dependency of Smithay v0.7.0, the version fixed by ADR 0003; it is not a
+# vulnerability and has no safe upgrade. Revisit when Smithay drops it.
+ignore = ["RUSTSEC-2026-0196"]
 
 [licenses]
 allow = [
