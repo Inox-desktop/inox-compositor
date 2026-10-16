@@ -38,6 +38,8 @@ jobs:
       # feature links the system `libxkbcommon` (`-lxkbcommon`), so the `cargo test`
       # and `cargo build` link steps need its `.so`; the dev package also pulls the
       # runtime `libxkbcommon0`. (Clippy passes without it because it does not link.)
+      # xkb-data provides the rules files the compositor compiles its deterministic
+      # `evdev`/`us` keymap from; without it the seat keyboard cannot be created.
       #
       # EGL/Mesa is only a test-time (runtime) dependency: Smithay's GlesRenderer
       # dlopen()s libEGL.so.1, nothing links against it at build time. libegl1 is the
@@ -49,13 +51,15 @@ jobs:
       - name: Install build/runtime system libraries
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libxkbcommon-dev libegl1 libgl1-mesa-dri
+          sudo apt-get install -y --no-install-recommends libxkbcommon-dev xkb-data libegl1 libgl1-mesa-dri
 
-      # Headless integration tests (tests/) require software rendering: M1 creates a
-      # logical output and renders a solid frame via EGL's surfaceless platform
-      # (EGL_MESA_platform_surfaceless) + GlesRenderer, driven by the
-      # LIBGL_ALWAYS_SOFTWARE=1 set in the job env above (PRD §6.1). cargo test runs
-      # the lib, bin and tests/ integration targets.
+      # Headless integration tests (tests/) require software rendering: the
+      # compositor creates a logical output and renders through EGL's surfaceless
+      # platform (EGL_MESA_platform_surfaceless) + GlesRenderer, driven by the
+      # LIBGL_ALWAYS_SOFTWARE=1 set in the job env above (PRD §6.1). Since M2 the
+      # window-management test also drives a real Wayland client over a socket pair
+      # to verify input handling and tiling. cargo test runs the lib, bin and tests/
+      # integration targets.
       - name: Test
         run: cargo test --all-features
 
