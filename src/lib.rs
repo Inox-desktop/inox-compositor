@@ -8,7 +8,7 @@
 //! The crate implements milestone **M2** (PRD §13): a headless compositor that
 //! creates an output, handles keyboard and pointer events, manages client
 //! toplevels as tiled windows and renders the composited result. There is still
-//! no DRM/KMS backend and no libinput backend (see ADR 0005 and ADR 0006).
+//! no DRM/KMS backend and no libinput backend (see ADR 0005 and ADR 0008).
 //!
 //! # Layout
 //!
