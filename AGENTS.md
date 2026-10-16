@@ -4,7 +4,7 @@
 
 ## 职责
 
-基于 Smithay 的 Wayland 合成器。所属层级：**L2**。
+基于 Smithay 的 Wayland 合成器。所属层级：**L2**。M1 广告 `wl_output`、`wl_compositor` 与私有 `inox_ipc` 全局（后者来自 `inox-protocols`）。
 
 ## 仓库特有约束
 
@@ -16,11 +16,11 @@
 - 非测试路径禁止 `unwrap()` / `expect()` / `panic!()` / `todo!()` / `unimplemented!()`。
 - 日志统一使用 `tracing`，禁止 `println!` / `eprintln!`；面向 CLI 的输出（如 `--help`）用显式 stdout 写入。
 - MSRV：本仓库 `rust-version = "1.86"`（`smithay` 0.7 依赖的 `calloop` 0.14 要求 rustc ≥ 1.86）。其余 L1 仓库仍为 1.85，升级需按根级 §8 说明破坏性影响。
-- 跨仓库依赖：`inox-common` 以锁定 `tag` 的 git 依赖引入，并同步登记 `deny.toml` 的 `[sources] allow-git`；禁止未锁定的 `branch = "main"`（根级 §8）。**git 依赖必须同时声明 `version`**，否则其隐式 `*` 版本要求会被 `deny.toml` 的 `[bans] wildcards = "deny"` 判为通配符依赖而失败。
+- 跨仓库依赖：`inox-common` 与 `inox-protocols` 均以锁定 `tag` 的 git 依赖引入，并同步登记 `deny.toml` 的 `[sources] allow-git`；禁止未锁定的 `branch = "main"`（根级 §8）。**git 依赖必须同时声明 `version`**，否则其隐式 `*` 版本要求会被 `deny.toml` 的 `[bans] wildcards = "deny"` 判为通配符依赖而失败。`inox-protocols` 是 Wayland 协议（核心 `wl_*` 绑定与私有 `inox-ipc`）的唯一来源。
 
 ## 主要依赖
 
-`smithay`（`default-features = false`，仅 `wayland_frontend` + `renderer_gl`）、`calloop`（`signals`）、`anyhow`、`thiserror`、`tracing`、`inox-common`（git 依赖，锁定 `tag`）。
+`smithay`（`default-features = false`，仅 `wayland_frontend` + `renderer_gl`）、`calloop`（`signals`）、`anyhow`、`thiserror`、`tracing`、`inox-common` 与 `inox-protocols`（均为 git 依赖，锁定 `tag`）。
 
 ## 命令
 
@@ -55,6 +55,7 @@ src/
   state.rs        Smithay 合成器状态与协议 handler
 tests/
   headless_render.rs   创建输出并渲染一帧（进程内）
+  ipc_global.rs        进程级：广告 inox_ipc 全局并应答 get_version
   signal_shutdown.rs   进程级：终止信号与帧预算都须以退出码 0 结束
 .github/        CI 工作流
 deny.toml       cargo-deny 依赖与许可证策略

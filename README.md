@@ -6,6 +6,8 @@
 
 M1：headless 合成器已实现——创建 `wl_output`、以 EGL surfaceless（`EGL_MESA_platform_surfaceless`）+ GLES 渲染纯色帧、收到终止信号或渲染完指定帧数后干净退出（退出码 0）。渲染路径与 `unsafe` 策略见元仓库 [ADR 0005](https://github.com/Inox-desktop/inox/blob/main/docs/adr/0005-headless-compositor-runtime.md)。
 
+合成器同时广告私有 `inox_ipc` 全局（来自 [`inox-protocols`](https://github.com/Inox-desktop/inox-protocols)）：`get_version` 返回协议版本，`reload_config` 现阶段以 `unsupported` 应答，配置热重载在后续里程碑接入。
+
 尚未实现（后续里程碑）：输入事件、DRM/KMS 与真实输出链路、窗口管理与平铺布局、XWayland。
 
 ### 运行
