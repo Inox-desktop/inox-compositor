@@ -34,6 +34,11 @@ jobs:
       - name: Clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
 
+      # libxkbcommon-dev is a build-time dependency: Smithay's `wayland_frontend`
+      # feature links the system `libxkbcommon` (`-lxkbcommon`), so the `cargo test`
+      # and `cargo build` link steps need its `.so`; the dev package also pulls the
+      # runtime `libxkbcommon0`. (Clippy passes without it because it does not link.)
+      #
       # EGL/Mesa is only a test-time (runtime) dependency: Smithay's GlesRenderer
       # dlopen()s libEGL.so.1, nothing links against it at build time. libegl1 is the
       # GLVND loader and pulls Mesa's EGL vendor driver (libegl-mesa0 -> libgbm1,
@@ -41,10 +46,10 @@ jobs:
       # including the llvmpipe/swrast software rasterizer used with
       # LIBGL_ALWAYS_SOFTWARE=1. apt lists are already cached on GitHub runners, so no
       # extra cache step is needed.
-      - name: Install EGL/Mesa runtime (headless software rendering)
+      - name: Install build/runtime system libraries
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libegl1 libgl1-mesa-dri
+          sudo apt-get install -y --no-install-recommends libxkbcommon-dev libegl1 libgl1-mesa-dri
 
       # Headless integration tests (tests/) require software rendering: M1 creates a
       # logical output and renders a solid frame via EGL's surfaceless platform
