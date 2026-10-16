@@ -1,19 +1,28 @@
 //! Smithay compositor state and protocol handlers.
 //!
 //! The compositor advertises the `wl_output`, `wl_compositor`, `wl_shm`,
-//! `wl_seat` and `xdg_wm_base` globals. Client toplevels become managed windows:
-//! they are registered in a [`Workspace`], tiled by [`LayoutConfig`] and mapped
-//! into a Smithay desktop `Space` that [`InoxState::render_frame`] composites.
+//! `wl_seat`, `xdg_wm_base` and private `inox_ipc` globals. Client toplevels
+//! become managed windows: they are registered in a [`Workspace`], tiled by
+//! [`LayoutConfig`] and mapped into a Smithay desktop `Space` that
+//! [`InoxState::render_frame`] composites.
 //!
 //! Input handling is split in two: Smithay's seat owns the keymap, modifier
 //! tracking and focus delivery, while [`crate::input::action_for_key`] turns a
 //! key press into a compositor [`Action`]. [`InoxState::inject_key`] and the
 //! pointer injection methods feed that path, so keyboard and pointer events can
 //! be exercised without a libinput backend (see ADR 0008).
+//!
+//! The Wayland bindings come from `inox-protocols`: the curated core `wl_*` types
+//! and the `inox-ipc` control protocol, so upstream versions are pinned in one
+//! place (see the workspace `AGENTS.md`).
 
 use std::{borrow::Cow, collections::HashMap, sync::OnceLock};
 
 use calloop::LoopSignal;
+use inox_protocols::{
+    ipc::inox_ipc::server::inox_ipc::{InoxIpc, ReloadResult, Request as InoxIpcRequest},
+    standard::core::server::{wl_buffer::WlBuffer, wl_seat::WlSeat, wl_surface::WlSurface},
+};
 use smithay::{
     backend::{
         input::{ButtonState, KeyState},
@@ -27,9 +36,8 @@ use smithay::{
     },
     output::{Mode, Output, PhysicalProperties, Scale as OutputScale, Subpixel},
     reexports::wayland_server::{
-        Client, DisplayHandle,
+        Client, DataInit, Dispatch, DisplayHandle, GlobalDispatch, New, Resource,
         backend::{ClientData, ClientId, DisconnectReason},
-        protocol::{wl_buffer::WlBuffer, wl_seat::WlSeat, wl_surface::WlSurface},
     },
     utils::{Logical, Point, Rectangle, SERIAL_COUNTER, Serial, Size, Transform},
     wayland::{
@@ -132,6 +140,14 @@ impl InoxState {
         let output_manager_state = OutputManagerState::new_with_xdg_output::<Self>(display_handle);
         let output = create_headless_output(config, display_handle);
         let renderer = HeadlessRenderer::new(config.output_size())?;
+
+        let ipc_version = inox_ipc_version();
+        let ipc_global = display_handle.create_global::<Self, InoxIpc, ()>(ipc_version, ());
+        debug!(
+            ?ipc_global,
+            version = ipc_version,
+            "advertised inox_ipc global"
+        );
 
         let xdg_shell_state = XdgShellState::new::<Self>(display_handle);
         let shm_state = ShmState::new::<Self>(display_handle, []);
@@ -648,6 +664,61 @@ impl XdgShellHandler for InoxState {
 
     fn toplevel_destroyed(&mut self, surface: ToplevelSurface) {
         self.remove_window(&surface);
+    }
+}
+
+/// The `inox_ipc` protocol version the compositor advertises and answers with.
+///
+/// Read from the interface generated in `inox-protocols` so the reported version
+/// can never drift from the protocol definition.
+fn inox_ipc_version() -> u32 {
+    <InoxIpc as Resource>::interface().version
+}
+
+/// Service the private `inox-ipc` control protocol.
+///
+/// M1 only has to prove the compositor genuinely consumes `inox-protocols`, so the
+/// handler is deliberately small: `get_version` reports the protocol version, and
+/// `reload_config` is answered with [`ReloadResult::Unsupported`] because
+/// configuration reloading arrives in a later milestone. Answering explicitly lets
+/// the shell tell "not implemented yet" apart from a transport failure.
+impl Dispatch<InoxIpc, ()> for InoxState {
+    fn request(
+        _state: &mut Self,
+        _client: &Client,
+        resource: &InoxIpc,
+        request: InoxIpcRequest,
+        _data: &(),
+        _display_handle: &DisplayHandle,
+        _data_init: &mut DataInit<'_, Self>,
+    ) {
+        match request {
+            // `destroy` is a destructor: wayland-server removes the object once the
+            // request has been dispatched, so there is nothing to clean up here.
+            InoxIpcRequest::Destroy => {}
+            InoxIpcRequest::GetVersion => resource.version(inox_ipc_version()),
+            InoxIpcRequest::ReloadConfig => resource.config_reloaded(ReloadResult::Unsupported),
+            // `Request` is `#[non_exhaustive]`: a later protocol revision may add
+            // requests, which this milestone ignores rather than second-guessing.
+            _ => {}
+        }
+    }
+}
+
+impl GlobalDispatch<InoxIpc, ()> for InoxState {
+    fn bind(
+        _state: &mut Self,
+        _handle: &DisplayHandle,
+        _client: &Client,
+        resource: New<InoxIpc>,
+        _global_data: &(),
+        data_init: &mut DataInit<'_, Self>,
+    ) {
+        let ipc = data_init.init(resource, ());
+
+        // The protocol asks the compositor to report its version as soon as the
+        // global is bound, so a client does not have to send `get_version` first.
+        ipc.version(inox_ipc_version());
     }
 }
 
