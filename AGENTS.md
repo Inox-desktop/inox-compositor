@@ -20,7 +20,9 @@
 
 ## 主要依赖
 
-`smithay`（`default-features = false`，仅 `wayland_frontend` + `renderer_gl`）、`calloop`（`signals`）、`anyhow`、`thiserror`、`tracing`、`inox-common`（git 依赖，锁定 `tag`）。
+`smithay`（`default-features = false`，仅 `desktop` + `wayland_frontend` + `renderer_gl`，**不启用**任何后端特性）、`calloop`（`signals`）、`anyhow`、`thiserror`、`tracing`、`inox-common`（git 依赖，锁定 `tag`）。
+
+**测试依赖**（不进入发布产物）：`proptest`（平铺布局与窗口簿记的算法验证）、`wayland-client` / `wayland-protocols`（集成测试驱动真实客户端）。
 
 ## 命令
 
@@ -39,8 +41,12 @@
 ## 测试要求
 
 - 纯逻辑必须有单元测试（`#[cfg(test)]`）；测试代码不受「禁止 unwrap/expect/panic」约束。
+- **核心算法用 `proptest`**：`layout`（master/stack 平铺几何）与 `workspace`（窗口顺序/焦点）的属性测试必须覆盖「每窗口一块、块不越界、块互不重叠、master 列在 stack 左侧」等不变量。
 - **headless 集成测试**（`tests/`）必须可在无显示设备、无 DRM 设备的环境中通过：CI 使用软件渲染（`LIBGL_ALWAYS_SOFTWARE=1`）。
 - 「渲染确实发生」必须由**离屏像素读回**断言，不能只依赖日志；颜色比较需留 ±1 个 8 位步长的容差（不同驱动的 float→unorm 舍入不同）。
+- 窗口/输入集成测试（`tests/window_management.rs`）在**同一进程内**用 `UnixStream::pair()` 连接真实 `wayland-client`，创建 ≥2 个 xdg toplevel，断言合成器可观测状态（托管窗口数、`Space` 中的平铺落点、焦点），**不得 mock 被测核心逻辑**。
+- 键盘解析依赖 XKB rules 文件（`xkb-data`），CI 必须安装该系统包。
+- 一个测试进程只能持有一个 EGL display，**每个测试二进制中只保留一个创建 EGL 的测试**。
 - 进程级测试必须自备私有 `XDG_RUNTIME_DIR`（Wayland 套接字绑定需要绝对路径的运行时目录），并给子进程设定超时，避免 CI 挂死。
 
 ## 目录结构
@@ -50,12 +56,16 @@ src/
   lib.rs          库入口与模块说明
   main.rs         可执行入口（CLI、日志初始化）
   config.rs       命令行解析与配置数据（不依赖 Smithay）
+  input.rs        按键 → 合成器动作的纯逻辑（Alt+Tab / Super+Q 等）
+  layout.rs       master/stack 平铺几何（纯逻辑 + proptest）
+  workspace.rs    窗口簿记与布局顺序（纯逻辑 + proptest）
   runtime.rs      calloop 事件循环：套接字、信号、帧定时器
   render.rs       EGL surfaceless + GLES 离屏渲染（unsafe 例外所在）
-  state.rs        Smithay 合成器状态与协议 handler
+  state.rs        Smithay 合成器状态、seat/xdg-shell/shm handler、窗口管理与输入注入
 tests/
-  headless_render.rs   创建输出并渲染一帧（进程内）
-  signal_shutdown.rs   进程级：终止信号与帧预算都须以退出码 0 结束
+  headless_render.rs     创建输出并渲染一帧（进程内）
+  signal_shutdown.rs     进程级：终止信号与帧预算都须以退出码 0 结束
+  window_management.rs   真实客户端创建 ≥2 窗口，断言平铺与输入（进程内）
 .github/        CI 工作流
 deny.toml       cargo-deny 依赖与许可证策略
 ```
